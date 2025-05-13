@@ -1,230 +1,441 @@
-openapi: 3.0.0
+openapi: 3.0.3
 info:
-  title: Recipes api
-  description: API for recipes project
-  version: 1.0.1
+  title: Recipes API
+  description: "API for managing users, recipes, favorites, and history."
+  version: 1.0.0
 servers:
-  # local:
-  - url: "http://127.0.0.1:80"
-    # remote:
-    # - url: "http://132.72.65.211"
-    description: SwaggerHub API Auto Mocking hey
+  - url: https://virtserver.swaggerhub.com/maytaltomer/RecepiesAPI/1.0.0
+    description: SwaggerHub API Auto Mocking
+  - url: https://example.com/api
+    description: Production server
+security:
+  - BearerAuth: []
 tags:
-  - name: Auth
-    description: All authentication related routes
-  - name: Users
-    description: All the user's personal app info
-  - name: Recipes
-    description: All reciepes general info
+  - name: User
+    description: Operations related to user accounts and preferences
+  - name: Recipe
+    description: Operations related to recipes and their management
 paths:
   /register:
     post:
       tags:
-        - Auth
-      summary: A new user from the client is added to the server
-      description: A JSON object contains all the details about the new user.
+        - User
+      summary: Register a new user
       requestBody:
-        description: Inventory item to add
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              $ref: "#/components/schemas/RegisterUser"
         required: true
       responses:
         "201":
-          description: A new user has been added
-        "400":
-          description: wrong input parameters
+          description: User registered
+        "409":
+          description: Username already exists
   /login:
     post:
       tags:
-        - Auth
-      summary: Login an exist user
-      description: An exist user login to the system
+        - User
+      summary: Login an existing user
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoginScheme"
+              $ref: "#/components/schemas/LoginUser"
         required: true
       responses:
         "200":
-          description: |
-            User was found in the DB and authenitcated successfully. The session ID is returned in a cookie named `session`.  You should include this cookie in subsequent requests
-          headers:
-            Set-Cookie:
-              style: simple
-              explode: false
+          description: Login successful
+          content:
+            application/json:
               schema:
-                type: string
-                example: session=87s97sdhgf279293f8w0e9
+                $ref: "#/components/schemas/inline_response_200"
         "401":
-          description: Authentication failed
-  /logout:
-    post:
-      tags:
-        - Auth
-      summary: logout a user from the system and delete his cookie
-      responses:
-        "200":
-          description: "the user has ben successfully logged out"
-  /users/favorites:
+          description: Invalid username or password
+  /user/profile:
     get:
       tags:
-        - Users
-      summary: Return the favorite recipes that were saved by user
-      description: Get an array of recipes that were saved by a specific user
+        - User
+      summary: Get logged-in user's profile
       responses:
         "200":
-          description: data about the user's favorites recipes returned
+          description: User profile returned
+        "401":
+          description: Unauthorized
+      security:
+        - BearerAuth: []
+  /user/favorites:
+    get:
+      tags:
+        - User
+      summary: Get user's favorite recipes
+      responses:
+        "200":
+          description: List of favorite recipes
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/RecipePreview"
+                  $ref: "#/components/schemas/PreviewRecipe"
         "401":
-          description: user is not authorized
+          description: Unauthorized
       security:
-        - cookieAuth: []
-    post:
-      tags:
-        - Users
-      summary: save recipe in the favorites list of a user
-      description: save recipe in the favorites list of a user
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                reciepeId:
-                  type: string
-                  description: reciepe's id which the user saved
-                  example: 716429
-      responses:
-        "200":
-          description: The Recipe successfully saved as favorite
-        "401":
-          description: user is not authorized
-      security:
-        - cookieAuth: []
-  /recipes/{recipeId}:
+        - BearerAuth: []
+  /user/my-recipes:
     get:
       tags:
-        - Recipes
-      summary: Return preview details on recipe by his ID
-      description: Return preview details on recipe by his ID
+        - User
+      summary: Get user's created recipes
+      responses:
+        "200":
+          description: List of recipes created by the user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PreviewRecipe"
+        "401":
+          description: Unauthorized
+      security:
+        - BearerAuth: []
+  /user/family-recipes:
+    get:
+      tags:
+        - User
+      summary: Get user's family recipes
+      responses:
+        "200":
+          description: List of family recipes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PreviewRecipe"
+        "401":
+          description: Unauthorized
+      security:
+        - BearerAuth: []
+  /user/last-search:
+    get:
+      tags:
+        - User
+      summary: Get user's last search query
+      responses:
+        "200":
+          description: Last search result
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PreviewRecipe"
+        "401":
+          description: Unauthorized
+      security:
+        - BearerAuth: []
+  /user/last-viewed-recipes:
+    get:
+      tags:
+        - User
+      summary: Get recipes user last viewed
+      responses:
+        "200":
+          description: List of last viewed recipes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PreviewRecipe"
+        "401":
+          description: Unauthorized
+      security:
+        - BearerAuth: []
+  /recipes/search:
+    get:
+      tags:
+        - Recipe
+      summary: Search recipes with filters
       parameters:
-        - name: recipeId
-          in: path
-          description: recipe's id
-          required: true
-          style: simple
-          explode: false
+        - name: query
+          in: query
+          description: Search keyword
+          required: false
+          schema:
+            type: string
+        - name: cuisine
+          in: query
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: diet
+          in: query
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: intolerances
+          in: query
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - popularity
+              - time
+        - name: limit
+          in: query
+          required: false
           schema:
             type: integer
       responses:
         "200":
-          description: data about the recipe
+          description: List of preview recipes
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/RecipePreview"
+                type: array
+                items:
+                  $ref: "#/components/schemas/PreviewRecipe"
+  /recipes:
+    post:
+      tags:
+        - Recipe
+      summary: Create a new recipe
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewRecipe"
+        required: true
+      responses:
+        "201":
+          description: Recipe created
+        "400":
+          description: Invalid recipe data
+        "401":
+          description: Unauthorized
+      security:
+        - BearerAuth: []
+  /recipes/{id}:
+    get:
+      tags:
+        - Recipe
+      summary: Get full recipe by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full recipe details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FullRecipe"
         "404":
-          description: recipeId is not exists
+          description: Recipe not found
+  /recipes/{id}/favorite:
+    post:
+      tags:
+        - Recipe
+      summary: Mark recipe as favorite
+      description: Adds the recipe to the authenticated user's list of favorites based on the JWT token
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Recipe added to favorites
+        "401":
+          description: Unauthorized
+      security:
+        - BearerAuth: []
+  /recipes/{id}/watch:
+    post:
+      tags:
+        - Recipe
+      summary: Mark recipe as watched
+      description: Adds the recipe to the authenticated user's list of watched based on the JWT token
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Recipe marked as watched
+        "401":
+          description: Unauthorized
+      security:
+        - BearerAuth: []
 components:
   schemas:
-    User:
+    RegisterUser:
+      required:
+        - country
+        - email
+        - firstName
+        - lastName
+        - password
+        - username
       type: object
       properties:
         username:
-          maxLength: 8
-          minLength: 3
           type: string
-          description: username conatins between 3 to 8 letters only
-          example: my_name
-        firstname:
+          example: john_doe
+        firstName:
           type: string
-          description: user's first name
-          example: my_first_name
-        lastname:
+          example: John
+        lastName:
           type: string
-          description: user's last name
-          example: my_last_name
+          example: Doe
+        email:
+          type: string
+          format: email
+          example: john@example.com
         country:
           type: string
-          description: user's country
-          example: Israel
+          example: IL
         password:
-          maxLength: 10
-          minLength: 5
           type: string
-          description:
-            password conatins between 5 to 10 chars, at least one of them
-            is a number and a special char
           format: password
-          example: my_name@12
-        email:
-          pattern: email
-          type: string
-          description: user's email
-          example: my_name12@gmail.com
-        # image-url:
-        #   pattern: URL
-        #   type: string
-        #   description: URL for the user's image
-        #   example: https://cloudinary.com/
-      description: Model containing user info
-    LoginScheme:
+          example: Secret123!
+    LoginUser:
+      required:
+        - password
+        - username
       type: object
       properties:
         username:
-          maxLength: 8
-          minLength: 3
           type: string
-          description: username conatins letters only
+          example: john_doe
         password:
-          maxLength: 10
-          minLength: 5
-          description: password conatins at least one number and one special char
+          type: string
           format: password
-      example:
-        username: my_name
-        password: my_name@12
-    RecipePreview:
+          example: Secret123!
+    NewRecipe:
+      required:
+        - ingredients
+        - instructions
+        - servings
+        - title
+      type: object
+      properties:
+        title:
+          type: string
+          example: Grandma's Apple Pie
+        image:
+          type: string
+          format: uri
+          example: https://example.com/images/pie.jpg
+        cookTime:
+          type: string
+          example: 45 minutes
+        likes:
+          type: integer
+          example: 0
+        isVegan:
+          type: boolean
+          example: false
+        isVegetarian:
+          type: boolean
+          example: true
+        isGlutenFree:
+          type: boolean
+          example: false
+        ingredients:
+          type: array
+          example:
+            - 2 apples
+            - 1 cup sugar
+          items:
+            type: string
+        instructions:
+          type: string
+          example: Slice apples. Mix with sugar. Bake.
+        servings:
+          type: integer
+          example: 4
+    PreviewRecipe:
       type: object
       properties:
         id:
-          type: integer
-          description: recipe identifier
-          example: 102
+          type: string
+          example: abc123
         title:
           type: string
-          description: recipe name
-          example: Simple Macaroni and Cheese
+          example: Grandma's Apple Pie
         image:
           type: string
-          description: recipe image
-          format: URL
-          example: https://spoonacular.com/recipeimages/655455-566x370.jpg
-        readyInMinutes:
+          format: uri
+          example: https://example.com/images/pie.jpg
+        cookTime:
+          type: string
+          example: 45 minutes
+        likes:
           type: integer
-          description: the time takes to make this recipe
-          example: 45
-        popularity:
-          type: integer
-          description: how many likes got this recipe
-          example: 5987
-        vegetarian:
+          example: 154
+        isVegan:
           type: boolean
-          description: indication if the recipe is vegetarian
-          example: false
-        vegan:
+        isVegetarian:
           type: boolean
-          description: indication if the recipe is vegan
-          example: false
-        glutenFree:
+        isGlutenFree:
           type: boolean
-          description: indication if the recipe is gluten free
-          example: false
+        isWatched:
+          type: boolean
+        isFavorite:
+          type: boolean
+    FullRecipe:
+      allOf:
+        - $ref: "#/components/schemas/PreviewRecipe"
+        - type: object
+          properties:
+            ingredients:
+              type: array
+              example:
+                - 2 apples
+                - 1 cup sugar
+              items:
+                type: string
+            instructions:
+              type: string
+              example: Slice apples. Mix with sugar. Bake.
+            servings:
+              type: integer
+              example: 4
+    inline_response_200:
+      type: object
+      properties:
+        token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

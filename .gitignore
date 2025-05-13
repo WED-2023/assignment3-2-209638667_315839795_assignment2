@@ -1,0 +1,51 @@
+# Node.js dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.*   # e.g., .env.test, .env.production
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime files
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Test artifacts
+test-results/
+*.sqlite
+*.local.db
+
+# Debug tools
+.vscode/
+.idea/
+*.swp
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Output folders
+dist/
+build/
+
+# Custom
+*.bak
+*.tmp
+
+# dotenv override
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

@@ -7,9 +7,48 @@ var path = require("path");
 var logger = require("morgan");
 const session = require("client-sessions");
 const DButils = require("./routes/utils/DButils");
+DButils.execQuery("SELECT DATABASE() as db")
+  .then(result => {
+    // MySQL 2 returns [rows, fields] if you use 'await', so unwrap if needed
+    if (Array.isArray(result) && result[0]?.db) {
+      console.log("App is connected to DB:", result[0].db);
+    } else if (Array.isArray(result) && result[0] && result[0][0]?.db) {
+      // Sometimes it's [ [ { db: 'dbname' } ], ... ]
+      console.log("App is connected to DB:", result[0][0].db);
+    } else {
+      console.log("App is connected to DB (raw result):", result);
+    }
+  })
+  .catch(err => {
+    console.error("Failed to get DB name!", err);
+  });
+  
 var cors = require("cors");
 
 var app = express();
+
+// ===== CORS CONFIGURATION =====
+const allowedOrigins = [
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+  // Add your production domain when deploying
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true); // allow mobile apps, etc.
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+}));
+
+app.options('*', cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
+// ===== END CORS CONFIGURATION =====
+
 app.use(logger("dev")); //logger
 app.use(express.json()); // parse application/json
 app.use(

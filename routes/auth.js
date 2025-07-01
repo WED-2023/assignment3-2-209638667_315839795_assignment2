@@ -30,10 +30,24 @@ router.post("/Register", async (req, res, next) => {
       parseInt(process.env.bcrypt_saltRounds)
     );
 
+    console.log('Registering new user:', user_details);
+    console.log('INSERT QUERY:', `INSERT INTO users (username, firstname, lastname, country, password, email, profilePic) VALUES ('${user_details.username}', '${user_details.firstname}', '${user_details.lastname}','${user_details.country}', '${hash_password}', '${user_details.email}', '${user_details.profilePic}')`);
+
+
     await DButils.execQuery(
-      `INSERT INTO users (username, firstname, lastname, country, password, email, profilePic) VALUES ('${user_details.username}', '${user_details.firstname}', '${user_details.lastname}',
-      '${user_details.country}', '${hash_password}', '${user_details.email}', '${user_details.profilePic}')`
+      `INSERT INTO users (username, firstname, lastname, country, password, email, profilePic)
+   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        user_details.username,
+        user_details.firstname,
+        user_details.lastname,
+        user_details.country,
+        hash_password,
+        user_details.email,
+        user_details.profilePic
+      ]
     );
+
     res.status(201).send({ message: "user created", success: true });
   } catch (error) {
     next(error);
@@ -63,7 +77,7 @@ router.post("/Login", async (req, res, next) => {
     console.log("session user_id login: " + req.session.user_id);
 
     // return cookie
-    res.status(200).send({ message: "login succeeded " , success: true });
+    res.status(200).send({ message: "login succeeded ", success: true });
   } catch (error) {
     next(error);
   }

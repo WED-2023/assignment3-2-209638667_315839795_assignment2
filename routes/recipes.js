@@ -119,6 +119,20 @@ router.post("/", async (req, res, next) => {
  * If the user is logged in, it logs the recipe as watched.
  */
 
+
+// Get a random recipe
+router.get('/random', async (req, res, next) => {
+  try {
+    // This returns ONE random recipe (change LIMIT as needed)
+    const randomRecipe = await DButils.execQuery(
+      `SELECT * FROM recipes ORDER BY RAND() LIMIT 1`
+    );
+    res.status(200).send({ recipes: randomRecipe });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/:recipeId", async (req, res, next) => {
   try {
     const { recipeId } = req.params;
@@ -169,5 +183,9 @@ router.get("/:recipeId", async (req, res, next) => {
     next(error);
   }
 });
+
+
+
+
 
 module.exports = router;

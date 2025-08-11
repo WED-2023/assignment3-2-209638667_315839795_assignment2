@@ -52,13 +52,75 @@ router.get("/profile", async (req, res, next) => {
 /**
  * This path gets body with recipeId and save this recipe in the favorites list of the logged-in user
  */
-router.post("/favorites", async (req, res, next) => {
+/**
+ * Add recipe to favorites
+ */
+router.post('/favorites', async (req, res, next) => {
   try {
+    // Check if user is logged in
+    if (!req.session?.user_id) {
+      return res.status(401).send({ message: "Authentication required" });
+    }
+
     const user_id = req.session.user_id;
-    const recipe_id = req.body.recipeId;
-    await user_utils.markAsFavorite(user_id, recipe_id);
-    res.status(200).send("The Recipe successfully saved as favorite");
+    const { recipeId } = req.body;
+
+    if (!recipeId) {
+      return res.status(400).send({ message: "Recipe ID is required" });
+    }
+
+    // Check if already in favorites
+    const existing = await DButils.execQuery(
+      `SELECT * FROM user_favorites WHERE user_id = ${user_id} AND recipe_id = ${recipeId}`
+    );
+
+    if (existing.length > 0) {
+      // Already in favorites - return success but with a 409 status
+      return res.status(409).send({
+        message: "Recipe already in favorites",
+        success: true,
+        alreadyExists: true
+      });
+    }
+
+    // Add to favorites - specify column names to avoid issues
+    await DButils.execQuery(
+      `INSERT INTO user_favorites (user_id, recipe_id) VALUES (${user_id}, ${recipeId})`
+    );
+
+    res.status(201).send({
+      message: "Recipe added to favorites",
+      success: true
+    });
   } catch (error) {
+    console.error("Error adding to favorites:", error);
+    next(error);
+  }
+});
+
+/**
+ * Remove recipe from favorites
+ */
+router.delete('/favorites/:recipeId', async (req, res, next) => {
+  try {
+    // Check if user is logged in
+    if (!req.session?.user_id) {
+      return res.status(401).send({ message: "Authentication required" });
+    }
+
+    const user_id = req.session.user_id;
+    const { recipeId } = req.params;
+
+    await DButils.execQuery(
+      `DELETE FROM user_favorites WHERE user_id = ${user_id} AND recipe_id = ${recipeId}`
+    );
+
+    res.status(200).send({
+      message: "Recipe removed from favorites",
+      success: true
+    });
+  } catch (error) {
+    console.error("Error removing from favorites:", error);
     next(error);
   }
 });
@@ -69,14 +131,36 @@ router.post("/favorites", async (req, res, next) => {
 router.get("/favorites", async (req, res, next) => {
   try {
     const user_id = req.session.user_id;
-    let favorite_recipes = {};
+
+    // Get favorite recipe IDs from database
     const recipes_id = await user_utils.getFavoriteRecipes(user_id);
+
+    // If no favorites, return empty array
+    if (!recipes_id || recipes_id.length === 0) {
+      return res.status(200).send([]);
+    }
+
+    // Extract recipe IDs into array
     let recipes_id_array = [];
-    recipes_id.map((element) => recipes_id_array.push(element.recipe_id)); //extracting the recipe ids into array
+    recipes_id.map((element) => recipes_id_array.push(element.recipe_id));
+
+    // Get recipe previews - this now handles errors gracefully and returns only successful recipes
     const results = await recipe_utils.getRecipesPreview(recipes_id_array);
+
+    // Always return 200 with whatever recipes were successfully loaded
+    // Even if it's an empty array due to API failures
     res.status(200).send(results);
+
   } catch (error) {
-    next(error);
+    console.error('Error in /favorites route:', error);
+    // Only send error if it's a database error, not API error
+    if (error.code && error.code.startsWith('ER_')) {
+      // Database error
+      next(error);
+    } else {
+      // For any other error, return empty array
+      res.status(200).send([]);
+    }
   }
 });
 
@@ -108,7 +192,7 @@ router.get("/my-recipes", async (req, res, next) => {
       SELECT recipe_id FROM watched_recipes WHERE user_id = ${user_id}
     `);
     const favoriteRows = await DButils.execQuery(`
-      SELECT recipe_id FROM FavoriteRecipes WHERE user_id = '${user_id}'
+      SELECT recipe_id FROM user_favorites WHERE user_id = '${user_id}'
     `);
 
     const watchedIds = watchedRows.map((r) => r.recipe_id);
@@ -135,8 +219,7 @@ router.get("/my-recipes", async (req, res, next) => {
  */
 router.get("/family-recipes", async (req, res, next) => {
   try {
-    const user_id = req.user_id;
-
+    // Fetch ALL family recipes, no user filtering
     const results = await DButils.execQuery(`
       SELECT id AS recipeId, title, image, cook_time AS cookTime,
              is_vegan AS isVegan, is_vegetarian AS isVegetarian, is_gluten_free AS isGlutenFree,
@@ -144,7 +227,6 @@ router.get("/family-recipes", async (req, res, next) => {
              who_made_it AS whoMadeIt,
              when_made AS whenMade
       FROM family_recipes
-      WHERE user_id = ${user_id}
     `);
 
     res.status(200).send(results);

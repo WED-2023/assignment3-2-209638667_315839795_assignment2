@@ -4,6 +4,7 @@ const recipes_utils = require("./utils/recipes_utils");
 const { query } = require("./utils/MySql");
 const DButils = require("./utils/DButils");
 const axios = require("axios");
+const MySql = require("./utils/MySql");
 
 const api_domain = "https://api.spoonacular.com/recipes";
 const apiKey = process.env.spooncular_apiKey;
@@ -120,15 +121,35 @@ router.post("/", async (req, res, next) => {
  */
 
 
-// Get a random recipe
+// Get 3 random recipes
 router.get('/random', async (req, res, next) => {
   try {
-    // This returns ONE random recipe (change LIMIT as needed)
-    const randomRecipe = await DButils.execQuery(
-      `SELECT * FROM recipes ORDER BY RAND() LIMIT 1`
-    );
-    res.status(200).send({ recipes: randomRecipe });
+    const number = req.query.number || 3;
+
+    // Get random recipes from Spoonacular
+    const response = await axios.get(`${api_domain}/random`, {
+      params: {
+        apiKey,
+        number: number,
+        includeNutrition: false
+      }
+    });
+
+    // Format the response to match preview format
+    const recipes = response.data.recipes.map(recipe => ({
+      id: recipe.id,
+      title: recipe.title,
+      image: recipe.image,
+      readyInMinutes: recipe.readyInMinutes,
+      aggregateLikes: recipe.aggregateLikes,
+      vegan: recipe.vegan,
+      vegetarian: recipe.vegetarian,
+      glutenFree: recipe.glutenFree
+    }));
+
+    res.status(200).send({ recipes: recipes });
   } catch (error) {
+    console.error("Random recipes error:", error);
     next(error);
   }
 });
@@ -139,7 +160,7 @@ router.get("/:recipeId", async (req, res, next) => {
 
     // Log as watched if user is logged in
     if (req.session?.user_id) {
-      await query(
+      await MySql.query(
         `
           INSERT INTO watched_recipes (user_id, recipe_id, viewed_at)
           VALUES (?, ?, CURRENT_TIMESTAMP)
@@ -149,7 +170,17 @@ router.get("/:recipeId", async (req, res, next) => {
       );
     }
 
-    // Try fetching from local DB first
+    // Check if user has favorited this recipe
+    let isFavorite = false;
+    let isWatched = true; // It's being watched now
+    if (req.session?.user_id) {
+      const favCheck = await DButils.execQuery(
+        `SELECT * FROM user_favorites WHERE user_id = ${req.session.user_id} AND recipe_id = ${recipeId}`
+      );
+      isFavorite = favCheck.length > 0;
+    }
+
+    // Try fetching from local DB first (for user-created recipes)
     const local = await DButils.execQuery(`
       SELECT * FROM recipes WHERE recipe_id = ${recipeId}
     `);
@@ -161,31 +192,143 @@ router.get("/:recipeId", async (req, res, next) => {
         SELECT description FROM ingredients WHERE recipe_id = ${recipeId}
       `);
 
-      return res.send({
+      // Format the recipe to match Spoonacular's format
+      const formattedRecipe = {
         id: recipe.recipe_id,
         title: recipe.title,
         image: recipe.image,
-        cookTime: recipe.cook_time,
-        likes: recipe.likes,
-        isVegan: recipe.is_vegan,
-        isVegetarian: recipe.is_vegetarian,
-        isGlutenFree: recipe.is_gluten_free,
-        ingredients: ingredients.map((i) => i.description),
+        readyInMinutes: recipe.cook_time || 30,
+        aggregateLikes: recipe.likes || 0,
+        vegan: recipe.is_vegan === 1,
+        vegetarian: recipe.is_vegetarian === 1,
+        glutenFree: recipe.is_gluten_free === 1,
+        extendedIngredients: ingredients.map(i => ({
+          original: i.description,
+          id: Math.random() // Add ID for Vue's :key requirement
+        })),
         instructions: recipe.instructions,
-        servings: recipe.servings,
-      });
+        // Format instructions for the frontend
+        analyzedInstructions: [{
+          name: "",
+          steps: recipe.instructions.split('\n').filter(step => step.trim()).map((step, index) => ({
+            number: index + 1,
+            step: step.trim()
+          }))
+        }],
+        servings: recipe.servings || 1,
+        isFavorite,
+        isWatched,
+        isUserRecipe: true
+      };
+
+      // IMPORTANT: Wrap in 'recipe' object as frontend expects
+      return res.send({ recipe: formattedRecipe });
     }
 
-    // Fallback: use Spoonacular
-    const spoonacular = await recipes_utils.getRecipeDetails(recipeId);
-    res.send(spoonacular);
+    // Fallback: use Spoonacular for external recipes
+    const response = await axios.get(`${api_domain}/${recipeId}/information`, {
+      params: {
+        apiKey,
+        includeNutrition: false
+      }
+    });
+
+    // Make sure analyzedInstructions exists (some recipes don't have it)
+    if (!response.data.analyzedInstructions || response.data.analyzedInstructions.length === 0) {
+      // Create basic instructions from the instructions field
+      if (response.data.instructions) {
+        response.data.analyzedInstructions = [{
+          name: "",
+          steps: response.data.instructions
+            .split('.')
+            .filter(step => step.trim())
+            .map((step, index) => ({
+              number: index + 1,
+              step: step.trim() + '.'
+            }))
+        }];
+      } else {
+        // No instructions at all
+        response.data.analyzedInstructions = [{
+          name: "",
+          steps: [{ number: 1, step: "No instructions available for this recipe." }]
+        }];
+      }
+    }
+
+    // Add user-specific data and WRAP IN 'recipe' OBJECT
+    const recipeData = {
+      recipe: {
+        ...response.data,
+        isFavorite,
+        isWatched,
+        isUserRecipe: false
+      }
+    };
+
+    res.send(recipeData);
   } catch (error) {
-    next(error);
+    console.error("Get recipe error:", error);
+    // Send more detailed error for debugging
+    if (error.response) {
+      // Spoonacular API error
+      console.error("Spoonacular API error:", error.response.data);
+      res.status(error.response.status).send({
+        message: "Failed to fetch recipe from external API",
+        error: error.response.data
+      });
+    } else if (error.code === 'ER_BAD_FIELD_ERROR') {
+      // Database error
+      res.status(500).send({
+        message: "Database error",
+        error: error.message
+      });
+    } else {
+      // Other errors
+      res.status(500).send({
+        message: "Failed to fetch recipe",
+        error: error.message
+      });
+    }
   }
 });
 
+router.put("/:recipeId/like", async (req, res, next) => {
+  try {
+    const { recipeId } = req.params;
+    const { likes } = req.body;
 
+    // Check if user is logged in
+    if (!req.session?.user_id) {
+      return res.status(401).send({ message: "Authentication required" });
+    }
 
+    // Only update if it's a local recipe (check if exists in DB)
+    const localRecipe = await DButils.execQuery(
+      `SELECT * FROM recipes WHERE recipe_id = ${recipeId}`
+    );
 
+    if (localRecipe.length === 0) {
+      // Not a local recipe, can't update likes for Spoonacular recipes
+      return res.status(400).send({
+        message: "Cannot update likes for external recipes"
+      });
+    }
+
+    // Update the likes count
+    await DButils.execQuery(
+      `UPDATE recipes SET likes = ${likes} WHERE recipe_id = ${recipeId}`
+    );
+
+    res.status(200).send({
+      message: "Likes updated successfully",
+      likes: likes,
+      success: true
+    });
+  } catch (error) {
+    console.error("Error updating likes:", error);
+    next(error);
+  }
+});
 
 module.exports = router;

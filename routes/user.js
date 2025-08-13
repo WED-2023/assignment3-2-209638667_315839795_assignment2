@@ -55,7 +55,7 @@ router.get("/profile", async (req, res, next) => {
 /**
  * Add recipe to favorites
  */
-router.post('/favorites', async (req, res, next) => {
+router.post("/favorites", async (req, res, next) => {
   try {
     // Check if user is logged in
     if (!req.session?.user_id) {
@@ -79,7 +79,7 @@ router.post('/favorites', async (req, res, next) => {
       return res.status(409).send({
         message: "Recipe already in favorites",
         success: true,
-        alreadyExists: true
+        alreadyExists: true,
       });
     }
 
@@ -90,7 +90,7 @@ router.post('/favorites', async (req, res, next) => {
 
     res.status(201).send({
       message: "Recipe added to favorites",
-      success: true
+      success: true,
     });
   } catch (error) {
     console.error("Error adding to favorites:", error);
@@ -101,7 +101,7 @@ router.post('/favorites', async (req, res, next) => {
 /**
  * Remove recipe from favorites
  */
-router.delete('/favorites/:recipeId', async (req, res, next) => {
+router.delete("/favorites/:recipeId", async (req, res, next) => {
   try {
     // Check if user is logged in
     if (!req.session?.user_id) {
@@ -117,7 +117,7 @@ router.delete('/favorites/:recipeId', async (req, res, next) => {
 
     res.status(200).send({
       message: "Recipe removed from favorites",
-      success: true
+      success: true,
     });
   } catch (error) {
     console.error("Error removing from favorites:", error);
@@ -150,11 +150,10 @@ router.get("/favorites", async (req, res, next) => {
     // Always return 200 with whatever recipes were successfully loaded
     // Even if it's an empty array due to API failures
     res.status(200).send(results);
-
   } catch (error) {
-    console.error('Error in /favorites route:', error);
+    console.error("Error in /favorites route:", error);
     // Only send error if it's a database error, not API error
-    if (error.code && error.code.startsWith('ER_')) {
+    if (error.code && error.code.startsWith("ER_")) {
       // Database error
       next(error);
     } else {

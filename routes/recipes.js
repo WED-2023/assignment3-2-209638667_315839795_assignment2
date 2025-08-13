@@ -120,9 +120,8 @@ router.post("/", async (req, res, next) => {
  * If the user is logged in, it logs the recipe as watched.
  */
 
-
 // Get 3 random recipes
-router.get('/random', async (req, res, next) => {
+router.get("/random", async (req, res, next) => {
   try {
     const number = req.query.number || 3;
 
@@ -131,12 +130,12 @@ router.get('/random', async (req, res, next) => {
       params: {
         apiKey,
         number: number,
-        includeNutrition: false
-      }
+        includeNutrition: false,
+      },
     });
 
     // Format the response to match preview format
-    const recipes = response.data.recipes.map(recipe => ({
+    const recipes = response.data.recipes.map((recipe) => ({
       id: recipe.id,
       title: recipe.title,
       image: recipe.image,
@@ -144,7 +143,7 @@ router.get('/random', async (req, res, next) => {
       aggregateLikes: recipe.aggregateLikes,
       vegan: recipe.vegan,
       vegetarian: recipe.vegetarian,
-      glutenFree: recipe.glutenFree
+      glutenFree: recipe.glutenFree,
     }));
 
     res.status(200).send({ recipes: recipes });
@@ -202,23 +201,28 @@ router.get("/:recipeId", async (req, res, next) => {
         vegan: recipe.is_vegan === 1,
         vegetarian: recipe.is_vegetarian === 1,
         glutenFree: recipe.is_gluten_free === 1,
-        extendedIngredients: ingredients.map(i => ({
+        extendedIngredients: ingredients.map((i) => ({
           original: i.description,
-          id: Math.random() // Add ID for Vue's :key requirement
+          id: Math.random(), // Add ID for Vue's :key requirement
         })),
         instructions: recipe.instructions,
         // Format instructions for the frontend
-        analyzedInstructions: [{
-          name: "",
-          steps: recipe.instructions.split('\n').filter(step => step.trim()).map((step, index) => ({
-            number: index + 1,
-            step: step.trim()
-          }))
-        }],
+        analyzedInstructions: [
+          {
+            name: "",
+            steps: recipe.instructions
+              .split("\n")
+              .filter((step) => step.trim())
+              .map((step, index) => ({
+                number: index + 1,
+                step: step.trim(),
+              })),
+          },
+        ],
         servings: recipe.servings || 1,
         isFavorite,
         isWatched,
-        isUserRecipe: true
+        isUserRecipe: true,
       };
 
       // IMPORTANT: Wrap in 'recipe' object as frontend expects
@@ -229,30 +233,39 @@ router.get("/:recipeId", async (req, res, next) => {
     const response = await axios.get(`${api_domain}/${recipeId}/information`, {
       params: {
         apiKey,
-        includeNutrition: false
-      }
+        includeNutrition: false,
+      },
     });
 
     // Make sure analyzedInstructions exists (some recipes don't have it)
-    if (!response.data.analyzedInstructions || response.data.analyzedInstructions.length === 0) {
+    if (
+      !response.data.analyzedInstructions ||
+      response.data.analyzedInstructions.length === 0
+    ) {
       // Create basic instructions from the instructions field
       if (response.data.instructions) {
-        response.data.analyzedInstructions = [{
-          name: "",
-          steps: response.data.instructions
-            .split('.')
-            .filter(step => step.trim())
-            .map((step, index) => ({
-              number: index + 1,
-              step: step.trim() + '.'
-            }))
-        }];
+        response.data.analyzedInstructions = [
+          {
+            name: "",
+            steps: response.data.instructions
+              .split(".")
+              .filter((step) => step.trim())
+              .map((step, index) => ({
+                number: index + 1,
+                step: step.trim() + ".",
+              })),
+          },
+        ];
       } else {
         // No instructions at all
-        response.data.analyzedInstructions = [{
-          name: "",
-          steps: [{ number: 1, step: "No instructions available for this recipe." }]
-        }];
+        response.data.analyzedInstructions = [
+          {
+            name: "",
+            steps: [
+              { number: 1, step: "No instructions available for this recipe." },
+            ],
+          },
+        ];
       }
     }
 
@@ -262,8 +275,8 @@ router.get("/:recipeId", async (req, res, next) => {
         ...response.data,
         isFavorite,
         isWatched,
-        isUserRecipe: false
-      }
+        isUserRecipe: false,
+      },
     };
 
     res.send(recipeData);
@@ -275,19 +288,19 @@ router.get("/:recipeId", async (req, res, next) => {
       console.error("Spoonacular API error:", error.response.data);
       res.status(error.response.status).send({
         message: "Failed to fetch recipe from external API",
-        error: error.response.data
+        error: error.response.data,
       });
-    } else if (error.code === 'ER_BAD_FIELD_ERROR') {
+    } else if (error.code === "ER_BAD_FIELD_ERROR") {
       // Database error
       res.status(500).send({
         message: "Database error",
-        error: error.message
+        error: error.message,
       });
     } else {
       // Other errors
       res.status(500).send({
         message: "Failed to fetch recipe",
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -311,7 +324,7 @@ router.put("/:recipeId/like", async (req, res, next) => {
     if (localRecipe.length === 0) {
       // Not a local recipe, can't update likes for Spoonacular recipes
       return res.status(400).send({
-        message: "Cannot update likes for external recipes"
+        message: "Cannot update likes for external recipes",
       });
     }
 
@@ -323,7 +336,7 @@ router.put("/:recipeId/like", async (req, res, next) => {
     res.status(200).send({
       message: "Likes updated successfully",
       likes: likes,
-      success: true
+      success: true,
     });
   } catch (error) {
     console.error("Error updating likes:", error);

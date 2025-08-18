@@ -1,5 +1,3 @@
-
-
 require("dotenv").config();
 //#region express configures
 var express = require("express");
@@ -7,48 +5,9 @@ var path = require("path");
 var logger = require("morgan");
 const session = require("client-sessions");
 const DButils = require("./routes/utils/DButils");
-DButils.execQuery("SELECT DATABASE() as db")
-  .then(result => {
-    // MySQL 2 returns [rows, fields] if you use 'await', so unwrap if needed
-    if (Array.isArray(result) && result[0]?.db) {
-      console.log("App is connected to DB:", result[0].db);
-    } else if (Array.isArray(result) && result[0] && result[0][0]?.db) {
-      // Sometimes it's [ [ { db: 'dbname' } ], ... ]
-      console.log("App is connected to DB:", result[0][0].db);
-    } else {
-      console.log("App is connected to DB (raw result):", result);
-    }
-  })
-  .catch(err => {
-    console.error("Failed to get DB name!", err);
-  });
-  
 var cors = require("cors");
 
 var app = express();
-
-// ===== CORS CONFIGURATION =====
-const allowedOrigins = [
-  'http://localhost:8080',
-  'http://127.0.0.1:8080',
-  // Add your production domain when deploying
-];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // allow mobile apps, etc.
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true
-}));
-
-app.options('*', cors({
-  origin: allowedOrigins,
-  credentials: true
-}));
-// ===== END CORS CONFIGURATION =====
-
 app.use(logger("dev")); //logger
 app.use(express.json()); // parse application/json
 app.use(
@@ -64,18 +23,26 @@ app.use(
     //the session will be extended by activeDuration milliseconds
   })
 );
+
+const FRONTEND_DIR = path.join(
+  __dirname,
+  "..",
+  "assignment3-3-209638667_315839795_assignment2",
+  "dist"
+);
 app.use(express.urlencoded({ extended: false })); // parse application/x-www-form-urlencoded
 app.use(express.static(path.join(__dirname, "public"))); //To serve static files such as images, CSS files, and JavaScript files
 //local:
-app.use(express.static(path.join(__dirname, "dist")));
+// app.use(express.static(path.join(__dirname, "dist")));
 //remote:
-// app.use(express.static(path.join(__dirname, '../assignment-3-3-frontend/dist')));
+app.use(express.static(FRONTEND_DIR));
 
 app.get("/", function (req, res) {
   //remote:
-  // res.sendFile(path.join(__dirname, '../assignment-3-3-frontend/dist/index.html'));
+  res.sendFile(path.join(FRONTEND_DIR, "index.html"));
+
   //local:
-  res.sendFile(__dirname + "/index.html");
+  // res.sendFile(__dirname + "/index.html");
 });
 
 // app.use(cors());
@@ -120,19 +87,21 @@ app.use("/users", user);
 app.use("/recipes", recipes);
 app.use("/", auth);
 
-// Default router
-app.use(function (err, req, res, next) {
-  console.error(err);
-  res.status(err.status || 500).send({ message: err.message, success: false });
-});
+// // Default router
+// app.use(function (err, req, res, next) {
+//   console.error(err);
+//   res.status(err.status || 500).send({ message: err.message, success: false });
+// });
 
-const server = app.listen(port, () => {
-  console.log(`Server listen on port ${port}`);
-});
+// const server = app.listen(port, () => {
+//   console.log(`Server listen on port ${port}`);
+// });
 
-process.on("SIGINT", function () {
-  if (server) {
-    server.close(() => console.log("server closed"));
-  }
-  process.exit();
-});
+// process.on("SIGINT", function () {
+//   if (server) {
+//     server.close(() => console.log("server closed"));
+//   }
+//   process.exit();
+// });
+
+module.exports = app;

@@ -87,6 +87,19 @@ app.use("/users", user);
 app.use("/recipes", recipes);
 app.use("/", auth);
 
+app.get("*", (req, res) => {
+  // Serve index.html for all routes that don't match static files
+  if (
+    !req.path.match(
+      /\.(js|css|png|jpg|jpeg|gif|svg|ico|map|woff|woff2|ttf|eot)$/
+    )
+  ) {
+    res.sendFile(path.join(FRONTEND_DIR, "index.html"));
+  } else {
+    res.status(404).send("File not found");
+  }
+});
+
 // // Default router
 // app.use(function (err, req, res, next) {
 //   console.error(err);
